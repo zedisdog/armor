@@ -2,7 +2,6 @@ package armor
 
 import (
 	"context"
-	"github.com/zedisdog/armor/log"
 	"github.com/zedisdog/armor/queue"
 	"github.com/zedisdog/armor/web"
 	"os"
@@ -11,7 +10,7 @@ import (
 	"syscall"
 )
 
-func Start(makeRoutes *web.MakeRoutes) {
+func Start(makeRoutes *web.MakeRoutes) error {
 	cxt, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	sigs := make(chan os.Signal, 1)
@@ -21,12 +20,13 @@ func Start(makeRoutes *web.MakeRoutes) {
 	err := queue.Start(cxt, &wg)
 	defer queue.Close()
 	if err != nil {
-		log.Log.WithError(err).Error("start queue failed")
-		return
+		return err
 	}
 	web.Start(cxt, &wg, makeRoutes)
 
 	<-sigs
 	cancel()
 	wg.Wait()
+
+	return nil
 }
