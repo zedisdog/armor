@@ -9,9 +9,9 @@ import (
 	"time"
 )
 
-func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes *MakeRoutes) {
+func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
 	r := gin.Default()
-	(*makeRoutes)(r)
+	makeRoutes(r)
 	srv := &http.Server{
 		Handler: r,
 	}

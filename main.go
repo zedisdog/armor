@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-func Start(makeRoutes *web.MakeRoutes) error {
+func Start(makeRoutes web.MakeRoutes) error {
 	cxt, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	sigs := make(chan os.Signal, 1)
