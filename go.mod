@@ -12,5 +12,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/sys v0.0.0-20200523222454-059865788121 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v3 v3.0.0-20200506231410-2ff61e1afc86 // indirect
 )
