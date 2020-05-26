@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/zedisdog/armor/config"
 	"github.com/zedisdog/armor/log"
 	"sync"
 	"time"
@@ -11,18 +12,8 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 )
 
-// WORKER_NUM 队列执行协程数
-const WORKER_NUM = 10
-
-// JOB_TIMEOUT 超时时间
-const JOB_TIMEOUT = 10
-
-// CONN_COEFFICIENT 链接比协程的倍数
-const CONN_COEFFICIENT = 2
-
 var (
-	queueHost = "127.0.0.1:11300"
-	conns     = make(chan *beanstalk.Conn, WORKER_NUM*CONN_COEFFICIENT)
+	conns = make(chan *beanstalk.Conn, config.Conf.Int("mq.beanstalkd.worker_num")*config.Conf.Int("mq.beanstalkd.conn_cap_times"))
 )
 
 // Close 关闭
@@ -42,7 +33,7 @@ func getConn(cxt context.Context) (*beanstalk.Conn, error) {
 			return conn, nil
 		default:
 			if len(conns) < cap(conns) {
-				conn, err := beanstalk.Dial("tcp", queueHost)
+				conn, err := beanstalk.Dial("tcp", config.Conf.String("mq.beanstalkd.host"))
 				if err != nil {
 					Close()
 					return nil, err
@@ -63,7 +54,7 @@ func putConn(conn *beanstalk.Conn) {
 
 // Start 开始队列
 func Start(cxt context.Context, wg *sync.WaitGroup) error {
-	for i := 0; i < WORKER_NUM; i++ {
+	for i := 0; i < config.Conf.Int("mq.beanstalkd.worker_num"); i++ {
 		startWorkers(cxt, wg)
 	}
 
@@ -90,6 +81,7 @@ func startWorkers(cxt context.Context, wg *sync.WaitGroup) {
 func process(cxt context.Context) {
 	conn, err := getConn(cxt)
 	if err != nil {
+		log.Log.WithError(err).Error("can not make conn with beanstalkd")
 		return
 	}
 	defer putConn(conn)
@@ -135,7 +127,7 @@ func Dispatch(job Job, ops ...func(*DespatchOptions)) error {
 	options := &DespatchOptions{
 		Pri:   1024,
 		Delay: 0 * time.Second,
-		Ttr:   JOB_TIMEOUT * time.Second,
+		Ttr:   config.Conf.Interface("mq.beanstalkd.job_timeout").(time.Duration) * time.Second,
 	}
 	for _, fn := range ops {
 		fn(options)

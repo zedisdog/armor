@@ -1,39 +1,52 @@
 package config
 
 import (
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"os"
 	"strings"
 )
 
-type Config interface {
+func init() {
+	if err := godotenv.Load("./.env"); err != nil {
+		panic(err)
+	}
+	if _, err := LoadYaml(os.Getenv("ARMOR_CONFIG_FILE")); err != nil {
+		panic(err)
+	}
+}
+
+var Conf *Config
+
+type Configure interface {
 	String(key string) string
 	Int(key string) int
 	Interface(key string) interface{}
 	Bool(key string) bool
 }
 
-type yamlConfig struct {
+type Config struct {
 	config map[string]interface{}
 }
 
-func (y *yamlConfig) String(key string) string {
+func (y *Config) String(key string) string {
 	return y.getValue(key).(string)
 }
 
-func (y *yamlConfig) Int(key string) int {
+func (y *Config) Int(key string) int {
 	return y.getValue(key).(int)
 }
 
-func (y *yamlConfig) Interface(key string) interface{} {
+func (y *Config) Interface(key string) interface{} {
 	return y.getValue(key)
 }
 
-func (y *yamlConfig) Bool(key string) bool {
+func (y *Config) Bool(key string) bool {
 	return y.getValue(key).(bool)
 }
 
-func (y *yamlConfig) getValue(key string) interface{} {
+func (y *Config) getValue(key string) interface{} {
 	keys := strings.Split(key, ".")
 	config := y.config
 	for index, key := range keys {
@@ -56,18 +69,22 @@ func (y *yamlConfig) getValue(key string) interface{} {
 	return nil
 }
 
-func LoadYaml(file string) (Config, error) {
-	data, err := getFileContent(file)
-	if err != nil {
-		return nil, err
-	}
-	c := make(map[string]interface{})
-	err = yaml.Unmarshal(data, &c)
-	if err != nil {
-		return nil, err
+// LoadYaml load yaml file in config, only once
+func LoadYaml(file string) (Configure, error) {
+	if Conf == nil {
+		data, err := getFileContent(file)
+		if err != nil {
+			return nil, err
+		}
+		c := make(map[string]interface{})
+		err = yaml.Unmarshal(data, &c)
+		if err != nil {
+			return nil, err
+		}
+		Conf = &Config{config: c}
 	}
 
-	return &yamlConfig{config: c}, nil
+	return Conf, nil
 }
 
 func getFileContent(file string) ([]byte, error) {

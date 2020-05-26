@@ -22,7 +22,7 @@ b:
 		fmt.Println(err)
 	}
 
-	config := &yamlConfig{config: c}
+	config := &Config{config: c}
 
 	a := config.String("a")
 	if a != "Easy!" {

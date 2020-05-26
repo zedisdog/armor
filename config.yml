@@ -1,0 +1,6 @@
+mq:
+  beanstalkd:
+    host: 127.0.0.1:11300 # 服务器地址
+    worker_num: 10        # 队列处理协程数
+    job_timeout: 60       # 任务超时时间
+    conn_cap_times: 2     # 队列链接池容量是处理协程的多少倍
