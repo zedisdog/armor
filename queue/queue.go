@@ -87,7 +87,9 @@ func process(cxt context.Context) {
 	defer putConn(conn)
 	id, body, err := conn.Reserve(3 * time.Second)
 	if err != nil {
-		log.Log.WithError(err).Warn("beanstalk error")
+		if !errors.Is(err, beanstalk.ErrTimeout) {
+			log.Log.WithError(err).Warn("beanstalk error")
+		}
 	} else {
 		log.Log.WithField("job", string(body)).Info("job got")
 		job := jsonToJob(body)
