@@ -10,10 +10,8 @@ import (
 )
 
 func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
-	r := gin.Default()
-	makeRoutes(r)
 	srv := &http.Server{
-		Handler: r,
+		Handler: SetupRoutes(makeRoutes),
 	}
 	wg.Add(1)
 	go func() {
@@ -33,4 +31,10 @@ func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
 			log.Log.Error(err)
 		}
 	}()
+}
+
+func SetupRoutes(makeRoutes MakeRoutes) *gin.Engine {
+	r := gin.Default()
+	makeRoutes(r)
+	return r
 }

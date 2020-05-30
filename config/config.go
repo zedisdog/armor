@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/joho/godotenv"
+	"github.com/zedisdog/armor/file"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -9,8 +10,10 @@ import (
 )
 
 func init() {
-	if err := godotenv.Load("./.env"); err != nil {
-		panic(err)
+	if file.FileExists("./.env") {
+		if err := godotenv.Load("./.env"); err != nil {
+			panic(err)
+		}
 	}
 	if _, err := LoadYaml(os.Getenv("ARMOR_CONFIG_FILE")); err != nil {
 		panic(err)
@@ -24,6 +27,7 @@ type Configure interface {
 	Int(key string) int
 	Interface(key string) interface{}
 	Bool(key string) bool
+	Bytes(key string) []byte
 }
 
 type Config struct {
@@ -44,6 +48,10 @@ func (y *Config) Interface(key string) interface{} {
 
 func (y *Config) Bool(key string) bool {
 	return y.getValue(key).(bool)
+}
+
+func (y *Config) Bytes(key string) []byte {
+	return []byte(y.getValue(key).(string))
 }
 
 func (y *Config) getValue(key string) interface{} {
