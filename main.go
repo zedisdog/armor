@@ -2,6 +2,7 @@ package armor
 
 import (
 	"context"
+	"github.com/zedisdog/armor/model"
 	"github.com/zedisdog/armor/queue"
 	"github.com/zedisdog/armor/web"
 	"os"
@@ -10,7 +11,16 @@ import (
 	"syscall"
 )
 
-func Start(makeRoutes web.MakeRoutes) error {
+type armor struct{}
+
+func NewArmor(migrate model.AutoMigrate) *armor {
+	if migrate != nil {
+		migrate(model.DB)
+	}
+	return &armor{}
+}
+
+func (a *armor) Start(makeRoutes web.MakeRoutes) error {
 	cxt, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	sigs := make(chan os.Signal, 1)
