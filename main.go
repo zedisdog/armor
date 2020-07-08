@@ -11,13 +11,27 @@ import (
 	"syscall"
 )
 
-type armor struct{}
+type armor struct {
+	startQueue bool
+}
 
-func NewArmor(migrate model.AutoMigrate) *armor {
+type ConfigFunc func(*armor)
+
+func WithQueue(enabled bool) ConfigFunc {
+	return func(a *armor) {
+		a.startQueue = enabled
+	}
+}
+
+func NewArmor(migrate model.AutoMigrate, configs ...ConfigFunc) *armor {
 	if migrate != nil {
 		migrate(model.DB)
 	}
-	return &armor{}
+	a := &armor{}
+	for _, config := range configs {
+		config(a)
+	}
+	return a
 }
 
 func (a *armor) Start(makeRoutes web.MakeRoutes) error {
@@ -27,10 +41,12 @@ func (a *armor) Start(makeRoutes web.MakeRoutes) error {
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	err := queue.Start(cxt, &wg)
-	defer queue.Close()
-	if err != nil {
-		return err
+	if a.startQueue {
+		err := queue.Start(cxt, &wg)
+		defer queue.Close()
+		if err != nil {
+			return err
+		}
 	}
 	web.Start(cxt, &wg, makeRoutes)
 

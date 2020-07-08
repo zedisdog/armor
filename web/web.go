@@ -29,6 +29,8 @@ func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
 		err := srv.Shutdown(timeOutCxt)
 		if err != nil {
 			log.Log.Error(err)
+		} else {
+			log.Log.Info("server will be safe shutdown in 30s")
 		}
 	}()
 }
