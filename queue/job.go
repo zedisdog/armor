@@ -2,11 +2,13 @@ package queue
 
 import (
 	jsoniter "github.com/json-iterator/go"
+	"github.com/zedisdog/armor/helper"
 	"github.com/zedisdog/armor/log"
 	"reflect"
 )
 
-var types map[string]reflect.Type = make(map[string]reflect.Type)
+var types = make(map[string]reflect.Type)
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // Job 队列任务接口
 type Job interface {
@@ -21,26 +23,22 @@ func Register(job Job) {
 }
 
 // covert struct to json
-func jobToJSON(data Job) []byte {
-	var m map[string]interface{}
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	dataJSON, _ := json.Marshal(data)
-	json.Unmarshal(dataJSON, &m)
-	m["type_name"] = reflect.TypeOf(data).Elem().Name()
-	newJSON, _ := json.Marshal(m)
-	return newJSON
+func jobToJSON(job Job) (result []byte) {
+	m := helper.Struct2Map(job)
+	m["type_name"] = reflect.TypeOf(job).Elem().Name()
+	result, _ = json.Marshal(m)
+	return
 }
 
-func jsonToJob(data []byte) Job {
+func jsonToJob(jobJson []byte) Job {
 	var m map[string]interface{}
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	err := json.Unmarshal(data, &m)
+	err := json.Unmarshal(jobJson, &m)
 	if err != nil {
 		log.Log.WithError(err).Warn("job parse failed")
 	}
 
 	t := types[m["type_name"].(string)]
 	job := reflect.New(t).Interface()
-	json.Unmarshal(data, job)
+	_ = json.Unmarshal(jobJson, job)
 	return job.(Job)
 }
