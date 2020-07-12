@@ -2,17 +2,19 @@ package armor
 
 import (
 	"context"
-	"github.com/zedisdog/armor/model"
-	"github.com/zedisdog/armor/queue"
-	"github.com/zedisdog/armor/web"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/zedisdog/armor/model"
+	"github.com/zedisdog/armor/queue"
+	"github.com/zedisdog/armor/web"
 )
 
 type armor struct {
 	startQueue bool
+	addr       string
 }
 
 type ConfigFunc func(*armor)
@@ -20,6 +22,12 @@ type ConfigFunc func(*armor)
 func WithQueue(enabled bool) ConfigFunc {
 	return func(a *armor) {
 		a.startQueue = enabled
+	}
+}
+
+func SetAddr(addr string) ConfigFunc {
+	return func(a *armor) {
+		a.addr = addr
 	}
 }
 
@@ -48,7 +56,10 @@ func (a *armor) Start(makeRoutes web.MakeRoutes) error {
 			return err
 		}
 	}
-	web.Start(cxt, &wg, makeRoutes)
+	if a.addr == "" {
+		a.addr = ":80"
+	}
+	web.Start(cxt, &wg, a.addr, makeRoutes)
 
 	<-sigs
 	cancel()
