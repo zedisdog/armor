@@ -138,7 +138,7 @@ func (q *queue) Dispatch(job Job, ops ...func(*DespatchOptions)) error {
 	options := &DespatchOptions{
 		Pri:   1024,
 		Delay: 0 * time.Second,
-		Ttr:   config.Conf.Interface("mq.beanstalkd.job_timeout").(time.Duration) * time.Second,
+		Ttr:   time.Duration(config.Conf.Int("mq.beanstalkd.job_timeout")) * time.Second,
 	}
 	for _, fn := range ops {
 		fn(options)
