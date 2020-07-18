@@ -12,56 +12,72 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 )
 
-var (
-	conns = make(chan *beanstalk.Conn, config.Conf.Int("mq.beanstalkd.worker_num")*config.Conf.Int("mq.beanstalkd.conn_cap_times"))
-)
+var Queue *queue
+
+type queue struct {
+	conns chan *beanstalk.Conn
+}
+
+func Instance() *queue {
+	if Queue == nil {
+		Init()
+	}
+
+	return Queue
+}
+
+func Init() {
+	Queue = &queue{
+		conns: make(chan *beanstalk.Conn, config.Conf.Int("mq.beanstalkd.worker_num")*config.Conf.Int("mq.beanstalkd.conn_cap_times")),
+	}
+}
 
 // Close 关闭
-func Close() {
-	for i := 0; i < len(conns); i++ {
-		conn := <-conns
+func (q *queue) Close() {
+	for i := 0; i < len(q.conns); i++ {
+		conn := <-q.conns
 		conn.Close()
 	}
 }
 
-func getConn(cxt context.Context) (*beanstalk.Conn, error) {
+func (q *queue) getConn(cxt context.Context) (*beanstalk.Conn, error) {
 	for {
 		select {
 		case <-cxt.Done():
 			return nil, errors.New("force quit")
-		case conn := <-conns:
+		case conn := <-q.conns:
 			return conn, nil
 		default:
-			if len(conns) < cap(conns) {
+			if len(q.conns) < cap(q.conns) {
 				conn, err := beanstalk.Dial("tcp", config.Conf.String("mq.beanstalkd.host"))
 				if err != nil {
-					Close()
+					q.Close()
 					return nil, err
 				}
-				conns <- conn
+				q.conns <- conn
 			}
 		}
 	}
 }
 
-func putConn(conn *beanstalk.Conn) {
-	if len(conns) < cap(conns) {
-		conns <- conn
+func (q *queue) putConn(conn *beanstalk.Conn) {
+	if len(q.conns) < cap(q.conns) {
+		q.conns <- conn
 	} else {
 		conn.Close()
 	}
 }
 
 // Start 开始队列
-func Start(cxt context.Context, wg *sync.WaitGroup) error {
+func (q *queue) Start(cxt context.Context, wg *sync.WaitGroup) error {
 	for i := 0; i < config.Conf.Int("mq.beanstalkd.worker_num"); i++ {
-		startWorkers(cxt, wg)
+		q.startWorkers(cxt, wg)
 	}
 
 	return nil
 }
 
-func startWorkers(cxt context.Context, wg *sync.WaitGroup) {
+func (q *queue) startWorkers(cxt context.Context, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		for {
@@ -71,20 +87,20 @@ func startWorkers(cxt context.Context, wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			default:
-				process(cxt)
+				q.process(cxt)
 			}
 			time.Sleep(3 * time.Second)
 		}
 	}()
 }
 
-func process(cxt context.Context) {
-	conn, err := getConn(cxt)
+func (q *queue) process(cxt context.Context) {
+	conn, err := q.getConn(cxt)
 	if err != nil {
 		log.Log.WithError(err).Error("can not make conn with beanstalkd")
 		return
 	}
-	defer putConn(conn)
+	defer q.putConn(conn)
 	id, body, err := conn.Reserve(3 * time.Second)
 	if err != nil {
 		if !errors.Is(err, beanstalk.ErrTimeout) {
@@ -114,17 +130,10 @@ func process(cxt context.Context) {
 	}
 }
 
-// DespatchOptions 下发任务参数
-type DespatchOptions struct {
-	Pri   uint32
-	Delay time.Duration
-	Ttr   time.Duration
-}
-
 // Dispatch 下发任务
-func Dispatch(job Job, ops ...func(*DespatchOptions)) error {
-	conn := <-conns
-	defer func() { conns <- conn }()
+func (q *queue) Dispatch(job Job, ops ...func(*DespatchOptions)) error {
+	conn := <-q.conns
+	defer func() { q.conns <- conn }()
 	Register(job)
 	options := &DespatchOptions{
 		Pri:   1024,
@@ -142,6 +151,13 @@ func Dispatch(job Job, ops ...func(*DespatchOptions)) error {
 	cost := time.Since(start)
 	fmt.Printf("%+v", cost)
 	return err
+}
+
+// DespatchOptions 下发任务参数
+type DespatchOptions struct {
+	Pri   uint32
+	Delay time.Duration
+	Ttr   time.Duration
 }
 
 // WithPri beanstalk put参数pri

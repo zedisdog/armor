@@ -1,26 +1,23 @@
 package config
 
 import (
-	"github.com/joho/godotenv"
-	"github.com/zedisdog/armor/file"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"os"
 	"strings"
 )
 
-func init() {
-	if file.FileExists("./.env") {
-		if err := godotenv.Load("./.env"); err != nil {
-			panic(err)
-		}
-	}
-	if _, err := LoadYaml(os.Getenv("ARMOR_CONFIG_FILE")); err != nil {
+var Conf Configure
+
+func Init(configPath string) {
+	var err error
+	if Conf, err = LoadYaml(configPath); err != nil {
 		panic(err)
 	}
 }
 
-var Conf *Config
+func Instance() Configure {
+	return Conf
+}
 
 type Configure interface {
 	String(key string) string

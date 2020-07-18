@@ -3,15 +3,18 @@ package web
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/zedisdog/armor/config"
 	"github.com/zedisdog/armor/log"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
 
-func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
+func Start(cxt context.Context, wg *sync.WaitGroup, routesMaker *RoutesMaker) {
 	srv := &http.Server{
-		Handler: SetupRoutes(makeRoutes),
+		Handler: SetupRoutes(routesMaker),
+		Addr:    config.Instance().String("server.host") + ":" + strconv.Itoa(config.Conf.Int("server.port")),
 	}
 	wg.Add(1)
 	go func() {
@@ -35,8 +38,8 @@ func Start(cxt context.Context, wg *sync.WaitGroup, makeRoutes MakeRoutes) {
 	}()
 }
 
-func SetupRoutes(makeRoutes MakeRoutes) *gin.Engine {
+func SetupRoutes(routesMaker *RoutesMaker) *gin.Engine {
 	r := gin.Default()
-	makeRoutes(r)
+	(*routesMaker)(r)
 	return r
 }

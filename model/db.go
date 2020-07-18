@@ -9,7 +9,7 @@ import (
 
 var DB *gorm.DB
 
-func init() {
+func Init() {
 	var err error
 	dbConfig := fmt.Sprintf(
 		"%s:%s@(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -23,6 +23,13 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func Instance() *gorm.DB {
+	if DB == nil {
+		Init()
+	}
+	return DB
 }
 
 type AutoMigrate func(db *gorm.DB)
