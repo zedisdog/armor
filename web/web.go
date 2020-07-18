@@ -14,7 +14,7 @@ import (
 func Start(cxt context.Context, wg *sync.WaitGroup, routesMaker *RoutesMaker) {
 	srv := &http.Server{
 		Handler: SetupRoutes(routesMaker),
-		Addr:    config.Instance().String("server.host") + ":" + strconv.Itoa(config.Conf.Int("server.port")),
+		Addr:    config.Instance().String("server.host") + ":" + strconv.Itoa(config.Instance().Int("server.port")),
 	}
 	wg.Add(1)
 	go func() {
