@@ -2,21 +2,23 @@ package armor
 
 import (
 	"context"
+	redis "github.com/zedisdog/armor/cache"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	casbin2 "github.com/zedisdog/armor/casbin"
 	"github.com/zedisdog/armor/config"
 	"github.com/zedisdog/armor/model"
 	"github.com/zedisdog/armor/queue"
 	"github.com/zedisdog/armor/web"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 )
 
 type armor struct {
 	enableQueue   bool                 // 是否启用队列
+	enableCache   bool                 // 是否使用缓存
 	autoMigrate   model.AutoMigrate    // 自动迁移方法
-	configPath    string               //配置文件路劲
+	configPath    string               // 配置文件路劲
 	routesMaker   *web.RoutesMaker     // 路由方法
 	casbinOptions []casbin2.ConfigFunc // 访问控制配置
 }
@@ -26,6 +28,12 @@ type ConfigFunc func(*armor)
 func WithQueue(enabled bool) ConfigFunc {
 	return func(a *armor) {
 		a.enableQueue = enabled
+	}
+}
+
+func WithCache(enabled bool) ConfigFunc {
+	return func(a *armor) {
+		a.enableCache = enabled
 	}
 }
 
@@ -80,6 +88,13 @@ func (a *armor) Start() error {
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
+	if a.enableCache {
+		cacheInstance, err := redis.InitCache()
+		defer cacheInstance.Close()
+		if err != nil {
+			return err
+		}
+	}
 	if a.enableQueue {
 		queue.Init()
 		err := queue.Instance().Start(cxt, &wg)
