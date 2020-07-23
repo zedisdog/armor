@@ -17,7 +17,7 @@ type armor struct {
 	enableQueue   bool                 // 是否启用队列
 	autoMigrate   model.AutoMigrate    // 自动迁移方法
 	configPath    string               //配置文件路劲
-	routesMaker   *web.RoutesMaker     // 路由方法
+	routes        web.Routes           // 路由
 	casbinOptions []casbin2.ConfigFunc // 访问控制配置
 }
 
@@ -47,9 +47,9 @@ func WithConfigPath(s string) ConfigFunc {
 	}
 }
 
-func WithRoutesMaker(maker *web.RoutesMaker) ConfigFunc {
+func WithRoutes(routes web.Routes) ConfigFunc {
 	return func(a *armor) {
-		a.routesMaker = maker
+		a.routes = routes
 	}
 }
 
@@ -88,7 +88,7 @@ func (a *armor) Start() error {
 			return err
 		}
 	}
-	web.Start(cxt, &wg, a.routesMaker)
+	web.Start(cxt, &wg, a.routes)
 
 	<-sigs
 	cancel()

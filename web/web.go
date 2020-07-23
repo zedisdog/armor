@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-func Start(cxt context.Context, wg *sync.WaitGroup, routesMaker *RoutesMaker) {
+func Start(cxt context.Context, wg *sync.WaitGroup, routes Routes) {
 	srv := &http.Server{
-		Handler: SetupRoutes(routesMaker),
+		Handler: SetupRoutes(routes),
 		Addr:    config.Instance().String("server.host") + ":" + strconv.Itoa(config.Instance().Int("server.port")),
 	}
 	wg.Add(1)
@@ -38,8 +38,11 @@ func Start(cxt context.Context, wg *sync.WaitGroup, routesMaker *RoutesMaker) {
 	}()
 }
 
-func SetupRoutes(routesMaker *RoutesMaker) *gin.Engine {
+func SetupRoutes(routes Routes) *gin.Engine {
 	r := gin.Default()
-	(*routesMaker)(r)
+	err := MakeRoutes(&r.RouterGroup, routes)
+	if err != nil {
+		panic(err)
+	}
 	return r
 }
