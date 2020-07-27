@@ -40,6 +40,7 @@ func Start(cxt context.Context, wg *sync.WaitGroup, routes Routes) {
 
 func SetupRoutes(routes Routes) *gin.Engine {
 	r := gin.Default()
+	r.Use(Cros)
 	err := MakeRoutes(&r.RouterGroup, routes)
 	if err != nil {
 		panic(err)
