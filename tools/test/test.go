@@ -48,7 +48,7 @@ func Get(handler gin.HandlerFunc) (*httptest.ResponseRecorder, *gin.Context) {
 	c.Request = httptest.NewRequest("GET", "/", nil)
 
 	if token != "" {
-		r.Use(auth.Auth)
+		r.Use(auth.Middleware)
 		c.Request.Header.Set("Authorization", token)
 	}
 
