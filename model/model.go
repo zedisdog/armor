@@ -28,3 +28,8 @@ func (m *Model) SetIDWithSnowFlake() {
 	}
 	m.ID = id
 }
+
+func (m *Model) BeforeCreate() error {
+	m.SetIDWithSnowFlake()
+	return nil
+}
