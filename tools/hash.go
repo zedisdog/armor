@@ -16,7 +16,7 @@ func Hash(str string, options ...WithHashOption) (string, error) {
 		o(&option)
 	}
 	cryptor := sha256.New()
-	_, err := cryptor.Write([]byte("secret"))
+	_, err := cryptor.Write([]byte(str))
 	if err != nil {
 		return "", err
 	}
