@@ -9,7 +9,7 @@ import (
 	"regexp"
 )
 
-var Casbin *casbin.Enforcer
+var Enforcer *casbin.Enforcer
 
 type Options struct {
 	PolicyFilePath string
@@ -20,9 +20,9 @@ type Options struct {
 func Init(options *Options) {
 	var err error
 	if options.Adapter != nil { //通过adapter或者策略文件路径实例化
-		Casbin, err = casbin.NewEnforcer(options.Model, options.Adapter)
+		Enforcer, err = casbin.NewEnforcer(options.Model, options.Adapter)
 	} else {
-		Casbin, err = casbin.NewEnforcer(options.Model, options.PolicyFilePath)
+		Enforcer, err = casbin.NewEnforcer(options.Model, options.PolicyFilePath)
 	}
 	if err != nil {
 		panic(err)
@@ -30,10 +30,10 @@ func Init(options *Options) {
 }
 
 func GetEnforcer(options *Options) (c *casbin.Enforcer) {
-	if Casbin == nil {
+	if Enforcer == nil {
 		Init(options)
 	}
-	return Casbin
+	return Enforcer
 }
 
 func NewOptions(configFuncs ...ConfigFunc) *Options {
