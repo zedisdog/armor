@@ -4,7 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
+
+const POST = "POST"
+const GET = "GET"
+const PUT = "PUT"
+const DELETE = "DELETE"
+const OPTIONS = "OPTIONS"
+const HEAD = "HEAD"
+const STATIC = "STATIC"
+const STATIC_FILE = "STATIC_FILE"
+const STATIC_FS = "STATIC_FS"
 
 type RoutesMaker func(*gin.Engine)
 
@@ -13,7 +24,7 @@ type Routes []Route
 type Route struct {
 	Path        string
 	Method      string
-	Handler     gin.HandlerFunc
+	Handler     interface{}
 	Middlewares gin.HandlersChain
 	Children    Routes
 	DisplayName string
@@ -49,18 +60,24 @@ func MakeRoutes(r *gin.RouterGroup, routes Routes) error {
 			//	r.Use(missings...)
 			//}
 			switch value.Method {
-			case "GET":
-				r.GET(value.Path, value.Handler)
-			case "POST":
-				r.POST(value.Path, value.Handler)
-			case "PUT":
-				r.PUT(value.Path, value.Handler)
-			case "DELETE":
-				r.DELETE(value.Path, value.Handler)
-			case "HEAD":
-				r.HEAD(value.Path, value.Handler)
-			case "OPTIONS":
-				r.OPTIONS(value.Path, value.Handler)
+			case GET:
+				r.GET(value.Path, value.Handler.(func(*gin.Context)))
+			case POST:
+				r.POST(value.Path, value.Handler.(func(*gin.Context)))
+			case PUT:
+				r.PUT(value.Path, value.Handler.(func(*gin.Context)))
+			case DELETE:
+				r.DELETE(value.Path, value.Handler.(func(*gin.Context)))
+			case HEAD:
+				r.HEAD(value.Path, value.Handler.(func(*gin.Context)))
+			case OPTIONS:
+				r.OPTIONS(value.Path, value.Handler.(func(*gin.Context)))
+			case STATIC:
+				r.Static(value.Path, value.Handler.(string))
+			case STATIC_FILE:
+				r.StaticFile(value.Path, value.Handler.(string))
+			case STATIC_FS:
+				r.StaticFS(value.Path, value.Handler.(http.FileSystem))
 			default:
 				return errors.New(fmt.Sprintf("unsupported http method <%s>", value.Method))
 			}
