@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/zedisdog/armor/app"
 	"reflect"
 	"testing"
 )
@@ -11,7 +11,7 @@ type student struct {
 	Name string `json:"name"`
 }
 
-func (s *student) Handle(c *Context) {}
+func (s *student) Handle(c *app.Context) {}
 
 func TestJobToJSON(t *testing.T) {
 	s := &student{"zed"}

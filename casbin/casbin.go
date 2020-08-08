@@ -5,11 +5,11 @@ import (
 	casbinModel "github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
 	gormadapter "github.com/casbin/gorm-adapter/v2"
-	"github.com/zedisdog/armor/model"
+	"github.com/google/wire"
+	"github.com/jinzhu/gorm"
+	"github.com/spf13/viper"
 	"regexp"
 )
-
-var Enforcer *casbin.Enforcer
 
 type Options struct {
 	PolicyFilePath string
@@ -17,64 +17,32 @@ type Options struct {
 	Model          casbinModel.Model
 }
 
-func Init(options *Options) {
-	var err error
+func NewOptions(v *viper.Viper, db *gorm.DB) *Options {
+	o := new(Options)
+	if v.IsSet("casbin.PolicyFilePath") && !v.IsSet("casbin.Adapter") {
+		a, _ := gormadapter.NewAdapterByDB(db)
+		o.Adapter = a
+	}
+	if !v.IsSet("casbin.Model") {
+		m, _ := casbinModel.NewModelFromString(DEFAULT_RBAC_CONFIG)
+		o.Model = m
+	} else {
+		o.Model = genModel(v.Get("casbin.Model"))
+	}
+
+	return o
+}
+
+func New(v *viper.Viper, options *Options) (Enforcer *casbin.Enforcer, err error) {
+	if !v.IsSet("casbin.enable") || !v.GetBool("casbin.enable") {
+		return nil, nil
+	}
 	if options.Adapter != nil { //通过adapter或者策略文件路径实例化
 		Enforcer, err = casbin.NewEnforcer(options.Model, options.Adapter)
 	} else {
 		Enforcer, err = casbin.NewEnforcer(options.Model, options.PolicyFilePath)
 	}
-	if err != nil {
-		panic(err)
-	}
-}
-
-func GetEnforcer(options *Options) (c *casbin.Enforcer) {
-	if Enforcer == nil {
-		Init(options)
-	}
-	return Enforcer
-}
-
-func NewOptions(configFuncs ...ConfigFunc) *Options {
-	options := &Options{}
-	for _, config := range configFuncs {
-		config(options)
-	}
-
-	if options.PolicyFilePath == "" && options.Adapter == nil {
-		a, _ := gormadapter.NewAdapterByDB(model.DB)
-		options.Adapter = a
-	}
-
-	if options.Model == nil {
-		m, _ := casbinModel.NewModelFromString(DEFAULT_RBAC_CONFIG)
-		options.Model = m
-	}
-
-	return options
-}
-
-type ConfigFunc func(options *Options)
-
-func WithPolicyFilePath(path string) ConfigFunc {
-	return func(options *Options) {
-		options.PolicyFilePath = path
-		options.Adapter = nil
-	}
-}
-
-func WithAdapter(a persist.Adapter) ConfigFunc {
-	return func(options *Options) {
-		options.Adapter = a
-	}
-}
-
-func WithModel(m interface{}) ConfigFunc {
-	cm := genModel(m)
-	return func(options *Options) {
-		options.Model = cm
-	}
+	return
 }
 
 func genModel(m interface{}) (cm casbinModel.Model) {
@@ -97,3 +65,5 @@ func isMultiLine(s string) bool {
 	matched, _ := regexp.MatchString("/[\r\n]+/", s)
 	return matched
 }
+
+var ProviderSet = wire.NewSet(NewOptions, New)

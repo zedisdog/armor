@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/zedisdog/armor/config"
+	"github.com/google/wire"
+	"github.com/spf13/viper"
+	"github.com/zedisdog/armor/app"
 	"github.com/zedisdog/armor/log"
 	"sync"
 	"time"
@@ -12,35 +14,56 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 )
 
-var Queue *queue
-
-type queue struct {
-	conns chan *beanstalk.Conn
-}
-
-func Instance() *queue {
-	if Queue == nil {
-		Init()
-	}
-
-	return Queue
-}
-
-func Init() {
-	Queue = &queue{
-		conns: make(chan *beanstalk.Conn, config.Conf.Int("mq.beanstalkd.worker_num")*config.Conf.Int("mq.beanstalkd.conn_cap_times")),
-	}
+type Queue struct {
+	host       string
+	workNum    int
+	jobTimeout int
+	conns      chan *beanstalk.Conn
+	app        *app.Armor
 }
 
 // Close 关闭
-func (q *queue) Close() {
+func (q *Queue) Close() {
 	for i := 0; i < len(q.conns); i++ {
 		conn := <-q.conns
 		conn.Close()
 	}
 }
 
-func (q *queue) getConn(cxt context.Context) (*beanstalk.Conn, error) {
+// Start 开始队列
+func (q *Queue) Start(a *app.Armor) error {
+	q.app = a
+	for i := 0; i < q.workNum; i++ {
+		q.startWorkers(a.CancelCxt, a.Wg)
+	}
+
+	return nil
+}
+
+// Dispatch 下发任务
+func (q *Queue) Dispatch(job app.Job, ops ...func(*app.DispatchOptions)) error {
+	conn := <-q.conns
+	defer func() { q.conns <- conn }()
+	Register(job)
+	options := &app.DispatchOptions{
+		Pri:   1024,
+		Delay: 0 * time.Second,
+		Ttr:   time.Duration(q.jobTimeout) * time.Second,
+	}
+	for _, fn := range ops {
+		fn(options)
+	}
+
+	jobJSON := jobToJSON(job)
+
+	start := time.Now()
+	_, err := conn.Put(jobJSON, options.Pri, options.Delay, options.Ttr)
+	cost := time.Since(start)
+	fmt.Printf("%+v", cost)
+	return err
+}
+
+func (q *Queue) getConn(cxt context.Context) (*beanstalk.Conn, error) {
 	for {
 		select {
 		case <-cxt.Done():
@@ -49,7 +72,7 @@ func (q *queue) getConn(cxt context.Context) (*beanstalk.Conn, error) {
 			return conn, nil
 		default:
 			if len(q.conns) < cap(q.conns) {
-				conn, err := beanstalk.Dial("tcp", config.Conf.String("mq.beanstalkd.host"))
+				conn, err := beanstalk.Dial("tcp", q.host)
 				if err != nil {
 					q.Close()
 					return nil, err
@@ -60,7 +83,7 @@ func (q *queue) getConn(cxt context.Context) (*beanstalk.Conn, error) {
 	}
 }
 
-func (q *queue) putConn(conn *beanstalk.Conn) {
+func (q *Queue) putConn(conn *beanstalk.Conn) {
 	if len(q.conns) < cap(q.conns) {
 		q.conns <- conn
 	} else {
@@ -68,16 +91,7 @@ func (q *queue) putConn(conn *beanstalk.Conn) {
 	}
 }
 
-// Start 开始队列
-func (q *queue) Start(cxt context.Context, wg *sync.WaitGroup) error {
-	for i := 0; i < config.Conf.Int("mq.beanstalkd.worker_num"); i++ {
-		q.startWorkers(cxt, wg)
-	}
-
-	return nil
-}
-
-func (q *queue) startWorkers(cxt context.Context, wg *sync.WaitGroup) {
+func (q *Queue) startWorkers(cxt context.Context, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		for {
@@ -94,7 +108,7 @@ func (q *queue) startWorkers(cxt context.Context, wg *sync.WaitGroup) {
 	}()
 }
 
-func (q *queue) process(cxt context.Context) {
+func (q *Queue) process(cxt context.Context) {
 	conn, err := q.getConn(cxt)
 	if err != nil {
 		log.Log.WithError(err).Error("can not make conn with beanstalkd")
@@ -109,7 +123,7 @@ func (q *queue) process(cxt context.Context) {
 	} else {
 		log.Log.WithField("job", string(body)).Info("job got")
 		job := jsonToJob(body)
-		cxt := NewContext(id)
+		cxt := app.NewContext(id, q.app)
 		job.Handle(cxt)
 		log.Log.WithField("job", string(body)).Info("job processed")
 		if cxt.PutBack != nil {
@@ -130,53 +144,16 @@ func (q *queue) process(cxt context.Context) {
 	}
 }
 
-// Dispatch 下发任务
-func (q *queue) Dispatch(job Job, ops ...func(*DespatchOptions)) error {
-	conn := <-q.conns
-	defer func() { q.conns <- conn }()
-	Register(job)
-	options := &DespatchOptions{
-		Pri:   1024,
-		Delay: 0 * time.Second,
-		Ttr:   time.Duration(config.Instance().Int("mq.beanstalkd.job_timeout")) * time.Second,
+func New(v *viper.Viper) app.Queue {
+	if v.GetBool("Queue.enable") {
+		return &Queue{
+			host:       v.GetString("mq.beanstalkd.host"),
+			workNum:    v.GetInt("mq.beanstalkd.work_num"),
+			jobTimeout: v.GetInt("mq.beanstalkd.job_timeout"),
+			conns:      make(chan *beanstalk.Conn, v.GetInt("mq.beanstalkd.worker_num")*v.GetInt("mq.beanstalkd.conn_cap_times")),
+		}
 	}
-	for _, fn := range ops {
-		fn(options)
-	}
-
-	jobJSON := jobToJSON(job)
-
-	start := time.Now()
-	_, err := conn.Put(jobJSON, options.Pri, options.Delay, options.Ttr)
-	cost := time.Since(start)
-	fmt.Printf("%+v", cost)
-	return err
+	return nil
 }
 
-// DespatchOptions 下发任务参数
-type DespatchOptions struct {
-	Pri   uint32
-	Delay time.Duration
-	Ttr   time.Duration
-}
-
-// WithPri beanstalk put参数pri
-func WithPri(pri uint32) func(map[string]interface{}) {
-	return func(options map[string]interface{}) {
-		options["pri"] = pri
-	}
-}
-
-// WithDelay beanstalk put参数delay
-func WithDelay(delay time.Duration) func(map[string]interface{}) {
-	return func(options map[string]interface{}) {
-		options["delay"] = delay
-	}
-}
-
-// WithTtr beanstalk put参数ttr
-func WithTtr(ttr time.Duration) func(map[string]interface{}) {
-	return func(options map[string]interface{}) {
-		options["ttr"] = ttr
-	}
-}
+var ProviderSet = wire.NewSet(New)

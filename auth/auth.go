@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/zedisdog/armor/config"
 	"github.com/zedisdog/armor/model"
 	"strconv"
 )
@@ -17,7 +16,7 @@ type MyCustomClaims struct {
 	jwt.StandardClaims
 }
 
-func GenerateToken(account model.HasId) (string, error) {
+func GenerateToken(account model.HasId, key []byte) (string, error) {
 	claims := MyCustomClaims{
 		"19960415",
 		jwt.StandardClaims{
@@ -26,16 +25,16 @@ func GenerateToken(account model.HasId) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	ss, err := token.SignedString(config.Instance().Bytes("jwt.key"))
+	ss, err := token.SignedString(key)
 	if err != nil {
 		return "", err
 	}
 	return ss, nil
 }
 
-func ParseToken(token string) (*MyCustomClaims, error) {
+func ParseToken(token string, key []byte) (*MyCustomClaims, error) {
 	t, err := jwt.ParseWithClaims(token, &MyCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return config.Instance().Bytes("jwt.key"), nil
+		return key, nil
 	})
 	if err != nil {
 		return nil, err

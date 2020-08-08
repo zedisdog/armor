@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/zedisdog/armor/auth"
 	"github.com/zedisdog/armor/model"
+	"github.com/zedisdog/armor/web/middlewares"
 	"net/http/httptest"
 )
 
@@ -48,7 +49,7 @@ func Get(handler gin.HandlerFunc) (*httptest.ResponseRecorder, *gin.Context) {
 	c.Request = httptest.NewRequest("GET", "/", nil)
 
 	if token != "" {
-		r.Use(auth.Middleware)
+		r.Use(middlewares.Auth)
 		c.Request.Header.Set("Authorization", token)
 	}
 
