@@ -29,7 +29,9 @@ func (m *Model) SetIDWithSnowFlake() {
 	m.ID = id
 }
 
-func (m *Model) BeforeCreate() error {
-	m.SetIDWithSnowFlake()
+func (m *Model) BeforeSave() error {
+	if m.ID == 0 {
+		m.SetIDWithSnowFlake()
+	}
 	return nil
 }
