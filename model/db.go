@@ -12,7 +12,7 @@ type AutoMigrate func(db *gorm.DB)
 
 func New(v *viper.Viper) (db *gorm.DB, err error) {
 	config := fmt.Sprintf(
-		"%s:%s@(%s:%d)/%s?charset=utf8mb4&parseTime=True&&loc=Asia/Shanghai",
+		"%s:%s@(%s:%d)/%s?charset=utf8mb4&parseTime=True&&loc=Asia%%2FShanghai",
 		v.GetString("db.mysql.user"),
 		v.GetString("db.mysql.pass"),
 		v.GetString("db.mysql.host"),
