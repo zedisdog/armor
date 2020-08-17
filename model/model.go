@@ -19,7 +19,6 @@ func GetSnow() *sonyflake.Sonyflake {
 
 type HasId interface {
 	GetId() uint64
-	SetIDWithSnowFlake()
 }
 
 type Model struct {
