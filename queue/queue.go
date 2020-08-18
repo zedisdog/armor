@@ -145,7 +145,7 @@ func (q *Queue) process(cxt context.Context) {
 }
 
 func New(v *viper.Viper) app.Queue {
-	if v.GetBool("Queue.enable") {
+	if v.GetBool("mq.beanstalkd.enable") {
 		return &Queue{
 			host:       v.GetString("mq.beanstalkd.host"),
 			workNum:    v.GetInt("mq.beanstalkd.work_num"),
